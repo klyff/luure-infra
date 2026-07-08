@@ -1,0 +1,6 @@
+apiVersion: v2
+name: aca-py-issuer
+description: ACA-Py agente emissor de credenciais (Luure)
+type: application
+version: 0.1.0
+appVersion: "py3.12-1.0.0"

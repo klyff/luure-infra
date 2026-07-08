@@ -1,0 +1,6 @@
+apiVersion: v2
+name: postgres
+description: PostgreSQL para wallets ACA-Py e eventos (Luure)
+type: application
+version: 0.1.0
+appVersion: "16"

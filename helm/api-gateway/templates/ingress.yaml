@@ -1,0 +1,72 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ .Release.Name }}-ingress
+  annotations:
+    kubernetes.io/ingress.class: "gce"
+    kubernetes.io/ingress.global-static-ip-name: "{{ .Values.ingress.staticIpName }}"
+    networking.gke.io/managed-certificates: "{{ .Values.ingress.managedCertName }}"
+    # Cloud Armor é associado via BackendConfig (abaixo).
+spec:
+  rules:
+    - host: {{ .Values.hosts.servidor }}
+      http:
+        paths:
+          - path: /api/*
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: {{ .Values.services.backendApi }}
+                port: { number: 3001 }
+          - path: /*
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: {{ .Values.services.vonNetwork }}
+                port: { number: 9000 }
+    - host: {{ .Values.hosts.efolha }}
+      http:
+        paths:
+          - path: /*
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: {{ .Values.services.efolha }}
+                port: { number: 80 }
+    - host: {{ .Values.hosts.gestao }}
+      http:
+        paths:
+          - path: /*
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: {{ .Values.services.gestao }}
+                port: { number: 80 }
+    - host: {{ .Values.hosts.wallet }}
+      http:
+        paths:
+          - path: /*
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: {{ .Values.services.wallet }}
+                port: { number: 80 }
+---
+apiVersion: networking.gke.io/v1
+kind: ManagedCertificate
+metadata:
+  name: {{ .Values.ingress.managedCertName }}
+spec:
+  domains:
+    - {{ .Values.hosts.servidor }}
+    - {{ .Values.hosts.efolha }}
+    - {{ .Values.hosts.gestao }}
+    - {{ .Values.hosts.wallet }}
+---
+apiVersion: cloud.google.com/v1
+kind: BackendConfig
+metadata:
+  name: {{ .Release.Name }}-armor-backendconfig
+spec:
+  securityPolicy:
+    name: "{{ .Values.ingress.armorPolicy }}"

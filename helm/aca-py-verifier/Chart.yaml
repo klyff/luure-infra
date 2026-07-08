@@ -1,0 +1,6 @@
+apiVersion: v2
+name: aca-py-verifier
+description: ACA-Py agente verificador (Luure — portal gestão)
+type: application
+version: 0.1.0
+appVersion: "py3.12-1.0.0"

@@ -1,0 +1,6 @@
+apiVersion: v2
+name: von-network
+description: Hyperledger Indy von-network (4 nós + webserver) para o Luure
+type: application
+version: 0.1.0
+appVersion: "latest"

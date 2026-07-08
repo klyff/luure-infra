@@ -1,0 +1,28 @@
+image:
+  repository: ghcr.io/bcgov/von-network-base
+  tag: latest
+  pullPolicy: IfNotPresent
+
+webserver:
+  port: 8000
+
+config:
+  registerNewDids: "True"
+  ledgerInstanceName: "Luure — MVP"
+  logLevel: INFO
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    cpu: "1"
+    memory: 1Gi
+
+persistence:
+  enabled: true
+  size: 2Gi
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1

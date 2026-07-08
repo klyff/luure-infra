@@ -1,0 +1,19 @@
+# GKE Ingress + managed TLS + Cloud Armor.
+# Admin ACA-Py (:8001/:8011) NUNCA é roteado aqui — somente cluster-internal.
+ingress:
+  staticIpName: sp-identity-trust-ingress-ip
+  managedCertName: sp-identity-trust-cert
+  armorPolicy: sp-identity-trust-armor
+
+hosts:
+  servidor: servidor.sp.preidx.global
+  efolha: e-folha.sp.preidx.global
+  gestao: gestao.sp.preidx.global
+  wallet: wallet.sp.preidx.global
+
+services:
+  vonNetwork: von-network
+  backendApi: backend-api
+  efolha: frontend-efolha
+  gestao: frontend-gestao
+  wallet: frontend-wallet

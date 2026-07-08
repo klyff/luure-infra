@@ -1,0 +1,34 @@
+image:
+  repository: ghcr.io/hyperledger/aries-cloudagent-python
+  tag: py3.12-1.0.0
+
+label: "Prodesp Issuer Agent"
+genesisUrl: http://von-network:9000/genesis
+walletName: issuer_wallet
+endpoint: https://servidor.sp.preidx.global
+
+ports:
+  inbound: 8000
+  admin: 8001
+
+# Secret Manager via Workload Identity (External Secrets / CSI). Nome do secret.
+# Chaves esperadas: wallet-key, admin-api-key, storage-config, storage-creds
+# (storage-config/storage-creds = Askar postgres_storage via PgBouncer/PostgreSQL).
+secretName: aca-py-issuer-secrets
+
+# Askar wallet storage em PostgreSQL CloudSP, com PgBouncer como endpoint padrão.
+walletStorageType: postgres_storage
+
+webhookUrl: http://webhook-handler:3002/webhooks
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    cpu: "1"
+    memory: 1Gi
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1

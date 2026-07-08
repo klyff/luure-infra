@@ -1,0 +1,145 @@
+name: luure-ledger
+
+# =============================================================================
+# Indy Ledger VM compose — REAL Hyperledger Indy ledger + ACA-Py agents.
+# Runs on a low-cost GCP Compute Engine VM (see deploy-ledger-vm.sh).
+#
+# Differences vs ../../ledger/docker-compose.yml (local dev):
+#   * No webhook-handler / postgres / redis (kept minimal for cost/RAM).
+#   * ACA-Py uses the local Askar (sqlite) wallet to keep this ledger-only VM
+#     minimal; the full MVP compose uses PostgreSQL + PgBouncer.
+#   * Admin API is protected by ACAPY_ADMIN_API_KEY (NOT --admin-insecure-mode).
+#   * ACAPY_ENDPOINT points at the VM external IP so DIDComm inbound works.
+#
+# All secrets/values come from the VM-local .env (see env.ledger.example).
+# NEVER commit a populated .env.
+# =============================================================================
+
+services:
+  von-network:
+    image: ghcr.io/bcgov/von-network-base:latest
+    # All-in-one: run the 4 Indy nodes (supervisord) AND the webserver in one
+    # container. start_nodes.sh blocks (supervisord nodaemon), so background it,
+    # give it time to init the genesis, then start the webserver.
+    command: "bash -c './scripts/start_nodes.sh & sleep 20 && ./scripts/start_webserver.sh'"
+    restart: unless-stopped
+    networks:
+      ledger:
+        # Static IP so the genesis pool transactions advertise a node address
+        # reachable from BOTH this container (webserver) and the separate
+        # ACA-Py containers on the same docker network.
+        ipv4_address: 172.30.0.10
+    ports:
+      - "9000:8000"            # web UI + /genesis (PUBLIC)
+      - "9701-9708:9701-9708"  # node ports
+    environment:
+      IP: "172.30.0.10"         # baked into genesis (von_generate_transactions -i)
+      DOCKERHOST: ${DOCKERHOST:-host-gateway}
+      REGISTER_NEW_DIDS: "True"
+      # The webserver Trust Anchor needs the default genesis Trustee seed to be
+      # write-ready; register_new_dids = REGISTER_NEW_DIDS AND LEDGER_SEED.
+      LEDGER_SEED: "000000000000000000000000Trustee1"
+      LEDGER_INSTANCE_NAME: "Luure — MVP"
+      LOG_LEVEL: INFO
+    volumes:
+      - von-data:/home/indy/ledger
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8000/genesis >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+
+  # Tails server — required for AnonCreds revocation (tails file hosting +
+  # accumulator publication). Without it the rev-reg never becomes "active".
+  tails-server:
+    image: ghcr.io/bcgov/tails-server:latest
+    restart: unless-stopped
+    networks:
+      - ledger
+    depends_on:
+      von-network:
+        condition: service_healthy
+    environment:
+      GENESIS_URL: http://von-network:8000/genesis
+    command: >
+      tails-server
+      --host 0.0.0.0
+      --port 6543
+      --storage-path /tails-files
+      --log-level INFO
+    volumes:
+      - tails-data:/tails-files
+
+  aca-py-issuer:
+    image: ghcr.io/hyperledger/aries-cloudagent-python:py3.12-1.0.0
+    restart: unless-stopped
+    networks:
+      - ledger
+    depends_on:
+      von-network:
+        condition: service_healthy
+    ports:
+      - "8000:8000"   # inbound DIDComm (PUBLIC)
+      - "8001:8001"   # admin API — guarded by ACAPY_ADMIN_API_KEY + firewall
+    environment:
+      ACAPY_GENESIS_URL: http://von-network:8000/genesis
+      ACAPY_WALLET_TYPE: askar
+      ACAPY_WALLET_NAME: issuer_wallet
+      ACAPY_WALLET_KEY: ${ISSUER_WALLET_KEY:?ISSUER_WALLET_KEY required}
+      ACAPY_ENDPOINT: ${ISSUER_ENDPOINT:?ISSUER_ENDPOINT required}
+      ACAPY_LABEL: "Prodesp Issuer Agent"
+      ACAPY_AUTO_PROVISION: "true"
+      # Allow importing the Trust Anchor seed to derive the public DID.
+      ACAPY_WALLET_ALLOW_INSECURE_SEED: "true"
+      ACAPY_ADMIN_API_KEY: ${ACAPY_ADMIN_API_KEY:?ACAPY_ADMIN_API_KEY required}
+      ACAPY_LOG_LEVEL: info
+    command: >
+      start
+      --inbound-transport http 0.0.0.0 8000
+      --outbound-transport http
+      --admin 0.0.0.0 8001
+      --auto-ping-connection
+      --auto-respond-messages
+      --notify-revocation
+      --tails-server-base-url http://tails-server:6543
+
+  aca-py-verifier:
+    image: ghcr.io/hyperledger/aries-cloudagent-python:py3.12-1.0.0
+    restart: unless-stopped
+    networks:
+      - ledger
+    depends_on:
+      von-network:
+        condition: service_healthy
+    ports:
+      - "8010:8010"   # inbound DIDComm (PUBLIC)
+      - "8011:8011"   # admin API — guarded by ACAPY_ADMIN_API_KEY + firewall
+    environment:
+      ACAPY_GENESIS_URL: http://von-network:8000/genesis
+      ACAPY_WALLET_TYPE: askar
+      ACAPY_WALLET_NAME: verifier_wallet
+      ACAPY_WALLET_KEY: ${VERIFIER_WALLET_KEY:?VERIFIER_WALLET_KEY required}
+      ACAPY_ENDPOINT: ${VERIFIER_ENDPOINT:?VERIFIER_ENDPOINT required}
+      ACAPY_LABEL: "Prodesp Verifier Agent"
+      ACAPY_AUTO_PROVISION: "true"
+      ACAPY_ADMIN_API_KEY: ${ACAPY_ADMIN_API_KEY:?ACAPY_ADMIN_API_KEY required}
+      ACAPY_LOG_LEVEL: info
+    command: >
+      start
+      --inbound-transport http 0.0.0.0 8010
+      --outbound-transport http
+      --admin 0.0.0.0 8011
+      --auto-ping-connection
+      --auto-respond-messages
+
+networks:
+  ledger:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24
+
+volumes:
+  von-data:
+  tails-data:

@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-von-network
+  labels:
+    app: von-network
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: von-network
+  template:
+    metadata:
+      labels:
+        app: von-network
+    spec:
+      containers:
+        - name: von-network
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["bash", "-c", "./scripts/start_webserver.sh"]
+          ports:
+            - containerPort: {{ .Values.webserver.port }}
+          env:
+            - name: REGISTER_NEW_DIDS
+              value: "{{ .Values.config.registerNewDids }}"
+            - name: LEDGER_INSTANCE_NAME
+              value: "{{ .Values.config.ledgerInstanceName }}"
+            - name: LOG_LEVEL
+              value: "{{ .Values.config.logLevel }}"
+          readinessProbe:
+            httpGet:
+              path: /status
+              port: {{ .Values.webserver.port }}
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: ledger-data
+              mountPath: /home/indy/ledger
+      volumes:
+        - name: ledger-data
+          {{- if .Values.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ .Release.Name }}-von-data
+          {{- else }}
+          emptyDir: {}
+          {{- end }}

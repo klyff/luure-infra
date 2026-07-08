@@ -1,0 +1,72 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-aca-py-issuer
+  labels:
+    app: aca-py-issuer
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: aca-py-issuer
+  template:
+    metadata:
+      labels:
+        app: aca-py-issuer
+    spec:
+      containers:
+        - name: aca-py
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          args:
+            - start
+            - --inbound-transport
+            - http
+            - "0.0.0.0"
+            - "{{ .Values.ports.inbound }}"
+            - --outbound-transport
+            - http
+            - --admin
+            - "0.0.0.0"
+            - "{{ .Values.ports.admin }}"
+            - --admin-api-key
+            - "$(ACAPY_ADMIN_API_KEY)"
+            - --notify-revocation
+            - --auto-ping-connection
+          env:
+            - name: ACAPY_GENESIS_URL
+              value: "{{ .Values.genesisUrl }}"
+            - name: ACAPY_WALLET_TYPE
+              value: askar
+            - name: ACAPY_WALLET_NAME
+              value: "{{ .Values.walletName }}"
+            - name: ACAPY_LABEL
+              value: "{{ .Values.label }}"
+            - name: ACAPY_ENDPOINT
+              value: "{{ .Values.endpoint }}"
+            - name: ACAPY_WEBHOOK_URL
+              value: "{{ .Values.webhookUrl }}"
+            # Askar wallet storage em PostgreSQL CloudSP, preferencialmente via
+            # PgBouncer em pool_mode=session para controlar conexões.
+            - name: ACAPY_WALLET_STORAGE_TYPE
+              value: "{{ .Values.walletStorageType }}"
+            # Segredos vêm do Secret Manager (Workload Identity), nunca hardcoded.
+            - name: ACAPY_WALLET_KEY
+              valueFrom:
+                secretKeyRef: { name: "{{ .Values.secretName }}", key: wallet-key }
+            - name: ACAPY_ADMIN_API_KEY
+              valueFrom:
+                secretKeyRef: { name: "{{ .Values.secretName }}", key: admin-api-key }
+            - name: ACAPY_WALLET_STORAGE_CONFIG
+              valueFrom:
+                secretKeyRef: { name: "{{ .Values.secretName }}", key: storage-config }
+            - name: ACAPY_WALLET_STORAGE_CREDS
+              valueFrom:
+                secretKeyRef: { name: "{{ .Values.secretName }}", key: storage-creds }
+          ports:
+            - { name: inbound, containerPort: {{ .Values.ports.inbound }} }
+            - { name: admin, containerPort: {{ .Values.ports.admin }} }
+          readinessProbe:
+            httpGet: { path: /status/ready, port: {{ .Values.ports.admin }} }
+            initialDelaySeconds: 15
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}

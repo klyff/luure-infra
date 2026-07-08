@@ -1,0 +1,18 @@
+# NOTE: chart OPCIONAL para ambientes CloudSP/Kubernetes. No MVP Docker, a
+# persistência padrão é PostgreSQL + PgBouncer em containers. Em produção
+# Kubernetes, este chart deve ser acompanhado por PgBouncer e storage/backup
+# gerenciados pela malha CloudSP.
+image:
+  repository: postgres
+  tag: "16-alpine"
+
+database: prodesp_ssi
+user: prodesp
+secretName: postgres-secrets   # key: password (Secret Manager → CSI)
+
+persistence:
+  size: 5Gi
+
+resources:
+  requests: { cpu: 250m, memory: 512Mi }
+  limits: { cpu: "1", memory: 1Gi }

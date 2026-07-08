@@ -1,0 +1,27 @@
+image:
+  repository: ghcr.io/hyperledger/aries-cloudagent-python
+  tag: py3.12-1.0.0
+
+label: "Prodesp Verifier Agent"
+genesisUrl: http://von-network:9000/genesis
+walletName: verifier_wallet
+endpoint: https://gestao.sp.preidx.global
+
+ports:
+  inbound: 8010
+  admin: 8011
+
+secretName: aca-py-verifier-secrets
+webhookUrl: http://webhook-handler:3002/webhooks
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    cpu: "1"
+    memory: 1Gi
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1

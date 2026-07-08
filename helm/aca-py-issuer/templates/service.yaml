@@ -1,0 +1,26 @@
+# Admin (:8001) só ClusterIP — NUNCA exposto via Ingress (ver THREAT_MODEL).
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-aca-py-issuer
+  labels:
+    app: aca-py-issuer
+spec:
+  type: ClusterIP
+  selector:
+    app: aca-py-issuer
+  ports:
+    - { name: inbound, port: {{ .Values.ports.inbound }}, targetPort: inbound }
+    - { name: admin, port: {{ .Values.ports.admin }}, targetPort: admin }
+---
+{{- if .Values.podDisruptionBudget.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ .Release.Name }}-aca-py-issuer
+spec:
+  minAvailable: {{ .Values.podDisruptionBudget.minAvailable }}
+  selector:
+    matchLabels:
+      app: aca-py-issuer
+{{- end }}

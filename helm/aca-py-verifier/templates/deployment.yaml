@@ -1,0 +1,84 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-aca-py-verifier
+  labels:
+    app: aca-py-verifier
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: aca-py-verifier
+  template:
+    metadata:
+      labels:
+        app: aca-py-verifier
+    spec:
+      containers:
+        - name: aca-py
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          args:
+            - start
+            - --inbound-transport
+            - http
+            - "0.0.0.0"
+            - "{{ .Values.ports.inbound }}"
+            - --outbound-transport
+            - http
+            - --admin
+            - "0.0.0.0"
+            - "{{ .Values.ports.admin }}"
+            - --admin-api-key
+            - "$(ACAPY_ADMIN_API_KEY)"
+            - --auto-ping-connection
+          env:
+            - name: ACAPY_GENESIS_URL
+              value: "{{ .Values.genesisUrl }}"
+            - name: ACAPY_WALLET_TYPE
+              value: askar
+            - name: ACAPY_WALLET_NAME
+              value: "{{ .Values.walletName }}"
+            - name: ACAPY_LABEL
+              value: "{{ .Values.label }}"
+            - name: ACAPY_ENDPOINT
+              value: "{{ .Values.endpoint }}"
+            - name: ACAPY_WEBHOOK_URL
+              value: "{{ .Values.webhookUrl }}"
+            - name: ACAPY_WALLET_KEY
+              valueFrom:
+                secretKeyRef: { name: "{{ .Values.secretName }}", key: wallet-key }
+            - name: ACAPY_ADMIN_API_KEY
+              valueFrom:
+                secretKeyRef: { name: "{{ .Values.secretName }}", key: admin-api-key }
+          ports:
+            - { name: inbound, containerPort: {{ .Values.ports.inbound }} }
+            - { name: admin, containerPort: {{ .Values.ports.admin }} }
+          readinessProbe:
+            httpGet: { path: /status/ready, port: {{ .Values.ports.admin }} }
+            initialDelaySeconds: 15
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-aca-py-verifier
+spec:
+  type: ClusterIP
+  selector:
+    app: aca-py-verifier
+  ports:
+    - { name: inbound, port: {{ .Values.ports.inbound }}, targetPort: inbound }
+    - { name: admin, port: {{ .Values.ports.admin }}, targetPort: admin }
+{{- if .Values.podDisruptionBudget.enabled }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ .Release.Name }}-aca-py-verifier
+spec:
+  minAvailable: {{ .Values.podDisruptionBudget.minAvailable }}
+  selector:
+    matchLabels:
+      app: aca-py-verifier
+{{- end }}
