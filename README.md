@@ -1,46 +1,43 @@
 # luure-infra
 
-Infrastructure for [Luure](https://luure.io): GCP VM (Terraform), ledger VM, Cloud Run deploy scripts, Helm charts, and Nginx reverse-proxy config.
+Infrastructure as Code for **Luure** — organizado por **provider** e parametrizado por **environment**.
 
 ## Layout
 
-| Path | Purpose |
-|------|---------|
-| `terraform-vm/` | Single GCE VM + data disk + firewall (ledger stack host) |
-| `ledger-vm/` | Indy von-network on a dedicated VM |
-| `cloudrun/` | Public Cloud Run demo deploy (API + frontends) |
-| `helm/` | Kubernetes charts (ACA-Py, postgres, redis, von-network, ingress) |
-| `nginx/` | `*.smartecm.io` reverse proxy for the VM hub |
+```text
+luure-infra/
+├── providers/
+│   ├── gcp/          # implementação atual (VM, Helm, Cloud Run, nginx)
+│   ├── oci/          # stub — alvo CloudSP
+│   ├── vercel/       # stub — site/agent/frontends
+│   ├── aws/          # stub
+│   └── redshift/     # stub
+├── environments/     # lab|mvp|dev|test|prod.tfvars
+├── modules/          # módulos compartilhados (futuro)
+├── scripts/          # ops compartilhados (ex.: dehydrate-vm)
+└── inventory.md      # matriz artefato × env × provider
+```
 
-## Defaults
+## Ambientes
 
-- Ledger / VM clone URL: `https://github.com/klyff/luure-ledger` (see `terraform-vm/variables.tf` `repo_url`)
-- GCP project examples still use `sp-identity-trust` where wired to existing resources; override via env/`terraform.tfvars` as needed.
+`lab` · `mvp` · `dev` · `test` · `prod` — ver `environments/*.tfvars`.
+
+## Defaults GCP
+
+- Região típica: `southamerica-east1`
+- Ledger clone: `https://github.com/klyff/luure-ledger`
+- Paths migrados: o que era `terraform-vm/`, `helm/`, etc. agora está em `providers/gcp/`.
 
 ## Quick start
 
-See comments in each subdirectory’s deploy scripts (`deploy-cloudrun.sh`, `deploy-ledger-vm.sh`, `terraform-vm/`).
+```bash
+# Exemplo VM ledger (GCP)
+cd providers/gcp/terraform-vm
+# ver variables.tf / README local
+```
 
-## VM dehydration (Luure migration)
+Matriz completa: [`inventory.md`](inventory.md).
 
-After PoC frontends move from `voce-br-vm` to Vercel (`*.luure.com.br`), reduce the VM’s public surface and cost:
+## VM dehydration (migração Luure)
 
-1. **Dehydrate on the VM** — stops host nginx and portal Docker services; keeps ledger (Indy), ACA-Py, Postgres, Redis, and API running:
-
-   ```bash
-   GCP_PROJECT_ID=sp-identity-trust ZONE=southamerica-east1-b \
-     gcloud compute ssh voce-br-vm --zone="$ZONE" --project="$GCP_PROJECT_ID" \
-     --tunnel-through-iap --command 'sudo bash -s' < scripts/dehydrate-vm.sh
-   ```
-
-   Use `DRY_RUN=1` piped the same way to preview actions.
-
-2. **Resize from your workstation** — downsize to `e2-small` after dehydration:
-
-   ```bash
-   ./scripts/resize-vm.sh
-   ```
-
-   Override `TARGET_MACHINE_TYPE`, `VM_NAME`, or `GCP_PROJECT_ID` as needed. Requires IAM: `compute.instances.stop`, `setMachineType`, `start`.
-
-3. **Validate** — run `validate-luure-migration.sh` in the `sovereignID.io` repo; ledger/API should still answer on the static IP (`34.39.174.212`) with `Host: ledger.smartecm.io` / `api.smartecm.io`.
+Scripts em `scripts/dehydrate-vm.sh` — ver histórico do README anterior / agentic IaC.
