@@ -8,13 +8,14 @@ Infrastructure as Code for **Luure** — organizado por **provider** e parametri
 luure-infra/
 ├── providers/
 │   ├── gcp/          # implementação atual (VM, Helm, Cloud Run, nginx)
-│   ├── oci/          # stub — alvo CloudSP
+│   ├── oci/          # stub — plano docs/OCI_IAC_PLAN.md
 │   ├── vercel/       # stub — site/agent/frontends
-│   ├── aws/          # stub
+│   ├── aws/          # stub — plano docs/AWS_IAC_PLAN.md
 │   └── redshift/     # stub
 ├── environments/     # lab|mvp|dev|test|prod.tfvars
 ├── modules/          # módulos compartilhados (futuro)
 ├── scripts/          # ops compartilhados (ex.: dehydrate-vm)
+├── docs/             # GCP_LUURE_MIGRATION + planos OCI/AWS
 └── inventory.md      # matriz artefato × env × provider
 ```
 
@@ -27,6 +28,8 @@ luure-infra/
 - Região típica: `southamerica-east1`
 - Ledger clone: `https://github.com/klyff/luure-ledger`
 - Paths migrados: o que era `terraform-vm/`, `helm/`, etc. agora está em `providers/gcp/`.
+
+Planos OCI / AWS (só documentos; Terraform ainda stub): [`docs/OCI_IAC_PLAN.md`](docs/OCI_IAC_PLAN.md), [`docs/AWS_IAC_PLAN.md`](docs/AWS_IAC_PLAN.md). Apply só com tenancy/conta Luure.
 
 ## Quick start
 
