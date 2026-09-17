@@ -1,0 +1,15 @@
+# Copy to terraform.tfvars after the Luure GCP project exists.
+# Do not apply against starlit-torus-492916-d7 (Predix).
+
+gcp_project_id = "luure-lab"
+# billing_account = "XXXXXX-XXXXXX-XXXXXX"
+environment   = "lab"
+region        = "southamerica-east1"
+zone          = "southamerica-east1-b"
+machine_type  = "e2-standard-4"
+enable_idle_schedule = true
+allow_expo_redirect  = true
+# agent_image    = "southamerica-east1-docker.pkg.dev/luure-lab/luure/luure-agent:lab"
+# dash_image     = "southamerica-east1-docker.pkg.dev/luure-lab/luure/luure-dashday:lab"
+# agent_base_url = "https://luure-lab-agent-xxxxx.run.app"
+# issuer_jwk / govbr_jwk: run scripts/generate-jwks.sh or pass JSON here

@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 # =============================================================================
+# LEGADO — e2-medium sem Postgres. Lab novo: providers/gcp/lab-min/
+# =============================================================================
 # Luure — REAL Hyperledger Indy ledger on a low-cost GCE VM
 # =============================================================================
 # Provisions a single small Compute Engine VM (Ubuntu 22.04 + Docker) that runs

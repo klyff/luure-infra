@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 # =============================================================================
+# LEGADO — FastAPI / portais Vite (MOCK_ACAPY). Não use para lab novo.
+# Stack vigente: providers/gcp/lab-min/ + mvp/luure-agent-server Dockerfile.
+# =============================================================================
 # Luure — public Google Cloud Run deploy
 # =============================================================================
 # Deploys the demoable parts of the Hyperledger Indy SSI MVP to Cloud Run as

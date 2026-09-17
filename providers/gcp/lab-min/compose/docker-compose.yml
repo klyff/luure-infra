@@ -1,0 +1,201 @@
+name: luure-lab-min
+
+# Digest pins (R5). bitnami/pgbouncer:1.24.1 has no public digest from this
+# workstation — tag only; pin at first apply if the registry answers.
+services:
+  von-network:
+    image: ghcr.io/bcgov/von-network-base:latest@sha256:f51b686c296a9e51738cfc38173bb2e03b1215c04d5c1b706409de28c3b42052
+    command: "bash -c './scripts/start_nodes.sh & sleep 20 && ./scripts/start_webserver.sh'"
+    restart: unless-stopped
+    networks:
+      ledger:
+        ipv4_address: 172.30.0.10
+    ports:
+      - "9000:8000"
+      - "9701-9708:9701-9708"
+    environment:
+      IP: "172.30.0.10"
+      DOCKERHOST: ${DOCKERHOST:-host-gateway}
+      REGISTER_NEW_DIDS: "True"
+      LEDGER_SEED: "000000000000000000000000Trustee1"
+      LEDGER_INSTANCE_NAME: "Luure — lab-min"
+      LOG_LEVEL: INFO
+    volumes:
+      - /data/ledger:/home/indy/ledger
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8000/genesis >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+
+  tails-server:
+    image: ghcr.io/bcgov/tails-server:latest@sha256:a30cea74a8a7e39e907d388e89ad23dbd9b2f9b8c73605cb2728d96248816296
+    restart: unless-stopped
+    networks:
+      - ledger
+    depends_on:
+      von-network:
+        condition: service_healthy
+    environment:
+      GENESIS_URL: http://von-network:8000/genesis
+    command: >
+      tails-server
+      --host 0.0.0.0
+      --port 6543
+      --storage-path /tails-files
+      --log-level INFO
+    volumes:
+      - /data/tails:/tails-files
+
+  postgres:
+    image: postgres:16-alpine@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685
+    restart: unless-stopped
+    networks:
+      - ledger
+    environment:
+      POSTGRES_USER: ${DB_USER:-luure}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD required}
+      POSTGRES_DB: ${DB_APP_NAME:-app_data}
+      DB_APP_NAME: ${DB_APP_NAME:-app_data}
+      DB_ISSUER_WALLET_NAME: ${DB_ISSUER_WALLET_NAME:-issuer_wallet}
+      DB_VERIFIER_WALLET_NAME: ${DB_VERIFIER_WALLET_NAME:-verifier_wallet}
+    volumes:
+      - /data/postgres:/var/lib/postgresql/data
+      - ./postgres/initdb:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-luure} -d ${DB_APP_NAME:-app_data}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  pgbouncer:
+    image: bitnami/pgbouncer:1.24.1
+    restart: unless-stopped
+    networks:
+      - ledger
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      POSTGRESQL_HOST: postgres
+      POSTGRESQL_PORT_NUMBER: "5432"
+      POSTGRESQL_USERNAME: ${DB_USER:-luure}
+      POSTGRESQL_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD required}
+      PGBOUNCER_DATABASE: "*"
+      PGBOUNCER_PORT: "6432"
+      PGBOUNCER_POOL_MODE: session
+      PGBOUNCER_MAX_CLIENT_CONN: ${PGBOUNCER_MAX_CLIENT_CONN:-200}
+      PGBOUNCER_DEFAULT_POOL_SIZE: ${PGBOUNCER_DEFAULT_POOL_SIZE:-20}
+    ports:
+      - "6432:6432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -p 6432 -U ${DB_USER:-luure} -d ${DB_APP_NAME:-app_data} || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine@sha256:ff02b58f971e7d7d156a1267e283fcbbeee91773b6aa36c49dac28ecfe28eadf
+    restart: unless-stopped
+    networks:
+      - ledger
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  aca-py-issuer:
+    image: ghcr.io/hyperledger/aries-cloudagent-python:py3.12-1.0.0@sha256:fc72426d48777b3a7170baa75186a81cc93fb104a3536b0beb1f318e1dca5098
+    restart: unless-stopped
+    networks:
+      - ledger
+    depends_on:
+      von-network:
+        condition: service_healthy
+      pgbouncer:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+      - "8001:8001"
+    environment:
+      ACAPY_GENESIS_URL: http://von-network:8000/genesis
+      ACAPY_WALLET_TYPE: askar
+      ACAPY_WALLET_NAME: issuer_wallet
+      ACAPY_WALLET_KEY: ${ISSUER_WALLET_KEY:?ISSUER_WALLET_KEY required}
+      ACAPY_WALLET_STORAGE_TYPE: postgres_storage
+      ACAPY_WALLET_STORAGE_CONFIG: '{"url":"pgbouncer:6432","max_connections":5,"wallet_scheme":"MultiWalletSingleTable"}'
+      ACAPY_WALLET_STORAGE_CREDS: '{"account":"${DB_USER:-luure}","password":"${DB_PASSWORD}","admin_account":"${DB_USER:-luure}","admin_password":"${DB_PASSWORD}"}'
+      ACAPY_ENDPOINT: ${ISSUER_ENDPOINT:?ISSUER_ENDPOINT required}
+      ACAPY_LABEL: "Luure Issuer"
+      ACAPY_AUTO_PROVISION: "true"
+      ACAPY_WALLET_ALLOW_INSECURE_SEED: "true"
+      ACAPY_ADMIN_API_KEY: ${ACAPY_ADMIN_API_KEY:?ACAPY_ADMIN_API_KEY required}
+      ACAPY_LOG_LEVEL: info
+    command: >
+      start
+      --inbound-transport http 0.0.0.0 8000
+      --outbound-transport http
+      --admin 0.0.0.0 8001
+      --auto-ping-connection
+      --auto-respond-messages
+      --notify-revocation
+      --tails-server-base-url ${TAILS_BASE_URL:-http://tails-server:6543}
+
+  aca-py-verifier:
+    image: ghcr.io/hyperledger/aries-cloudagent-python:py3.12-1.0.0@sha256:fc72426d48777b3a7170baa75186a81cc93fb104a3536b0beb1f318e1dca5098
+    restart: unless-stopped
+    networks:
+      - ledger
+    depends_on:
+      von-network:
+        condition: service_healthy
+      pgbouncer:
+        condition: service_healthy
+    ports:
+      - "8010:8010"
+      - "8011:8011"
+    environment:
+      ACAPY_GENESIS_URL: http://von-network:8000/genesis
+      ACAPY_WALLET_TYPE: askar
+      ACAPY_WALLET_NAME: verifier_wallet
+      ACAPY_WALLET_KEY: ${VERIFIER_WALLET_KEY:?VERIFIER_WALLET_KEY required}
+      ACAPY_WALLET_STORAGE_TYPE: postgres_storage
+      ACAPY_WALLET_STORAGE_CONFIG: '{"url":"pgbouncer:6432","max_connections":5,"wallet_scheme":"MultiWalletSingleTable"}'
+      ACAPY_WALLET_STORAGE_CREDS: '{"account":"${DB_USER:-luure}","password":"${DB_PASSWORD}","admin_account":"${DB_USER:-luure}","admin_password":"${DB_PASSWORD}"}'
+      ACAPY_ENDPOINT: ${VERIFIER_ENDPOINT:?VERIFIER_ENDPOINT required}
+      ACAPY_LABEL: "Luure Verifier"
+      ACAPY_AUTO_PROVISION: "true"
+      ACAPY_ADMIN_API_KEY: ${ACAPY_ADMIN_API_KEY:?ACAPY_ADMIN_API_KEY required}
+      ACAPY_LOG_LEVEL: info
+    command: >
+      start
+      --inbound-transport http 0.0.0.0 8010
+      --outbound-transport http
+      --admin 0.0.0.0 8011
+      --auto-ping-connection
+      --auto-respond-messages
+
+  nginx:
+    image: nginx:1.27-alpine@sha256:65645c7bb6a0661892a8b03b89d0743208a18dd2f3f17a54ef4b76fb8e2f2a10
+    restart: unless-stopped
+    networks:
+      - ledger
+    depends_on:
+      - von-network
+      - tails-server
+    ports:
+      - "80:80"
+      - "6543:6543"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+
+networks:
+  ledger:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24

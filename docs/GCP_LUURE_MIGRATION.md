@@ -17,6 +17,12 @@ Consequência prática: **nada foi verificado dentro da conta nova**. Tudo abaix
 descreve o que já roda hoje (Vercel, Docker local, EAS) e o que planejamos criar lá.
 Primeiro item do kickoff é liberar IAM para o time e reautenticar o CLI.
 
+**Implementação vigente (2026-09-17):** `providers/gcp/lab-min/` — 1 VM compose
+`e2-standard-4` + Cloud Run `luure-agent-server` (`min=0`) + Cloud Run
+`luure-dashday` (`min=0`), Postgres na VM, Direct VPC, sem Cloud SQL/GKE/NAT.
+`terraform apply` só depois de `gcp_project_id` Luure. Prova: `tests/run-phases.sh`.
+`terraform-vm/`, `helm/` e `cloudrun/deploy-cloudrun.sh` são legado.
+
 ---
 
 ## 2. O que já rodamos — inventário verificado
@@ -152,20 +158,19 @@ A demo continua na Vercel até haver paridade. Cutover de DNS é o último passo
   `VERIFIER_WALLET_KEY`, credenciais de banco
 - Artifact Registry privado, imagens pinadas por digest
 
-### Fase 2 — Ledger no `luure-lab`
+### Fase 2 — Ledger no `luure-lab` (lab-min)
 
-- Subir os charts que já existem (`von-network`, ACA-Py issuer/verifier, postgres,
-  pgbouncer, redis) com admin API protegida por key e exposição só interna
-- Disco PD-SSD com snapshot agendado; backup do Postgres das wallets askar
-- Rodar `setup.py` e validar schemas, cred defs e registro de revogação
-- Critério de saída: emissão e verificação DIDComm ponta a ponta no lab
+- `terraform apply` em `providers/gcp/lab-min` (não Helm, não `terraform-vm`)
+- Compose: von-network 4 nós, tails, ACA-Py com admin API key, Postgres +
+  PgBouncer + Redis; disco `pd-balanced`
+- Admin ACA-Py e Postgres só na VPC; DIDComm/genesis no IP público
+- Critério de saída: genesis estável + quórum 4/4
 
-### Fase 3 — Serviços de hoje no `luure-mvp`
+### Fase 3 — Agent no mesmo projeto (Cloud Run, sem Cloud SQL)
 
-- `luure-agent-server` em Cloud Run, Cloud SQL Postgres, segredos do Secret Manager
-- Flags: `dev_code` do OTP desligado, `ALLOW_EXPO_REDIRECT` desligado
-- Portal de demonstração atrás de Cloud Armor
-- Vercel permanece servindo `agent.luure.com.br` durante toda a fase
+- `luure-agent-server` em Cloud Run `min=0`, Direct VPC até o Postgres da VM
+- Flags: `OTP_EXPOSE_DEV_CODE=0`, `ALLOW_EXPO_REDIRECT` só no lab
+- Vercel permanece servindo `agent.luure.com.br` até paridade / cutover de DNS
 
 ### Fase 4 — Observabilidade, custo e rollback
 
@@ -198,4 +203,5 @@ Os donos serão atribuídos no kickoff, quando o IAM da conta nova estiver liber
 
 1. Liberar IAM na conta GCP da Luure para o time e reautenticar o `gcloud` local
 2. Criar `luure-lab` com as org policies da Fase 0 e o bucket de estado do Terraform
-3. Subir o ledger no lab a partir de `providers/gcp/` com as correções R1, R2 e R5
+3. Subir o lab-min (`providers/gcp/lab-min`) com as correções R1, R2 e R5 — sem apply enquanto o CLI estiver no Predix
+4. Provar a migração com `providers/gcp/lab-min/tests/run-phases.sh` (Fase 1 landing+VM, Fase 2 ledger, Fase 3 agent+dashday). Exit 2 = gate Predix / sem project_id.

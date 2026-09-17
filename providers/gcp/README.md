@@ -1,13 +1,14 @@
 # Provider: GCP
 
-Implementação atual de demonstração / MVP (southamerica-east1).
+Lab funcional de menor custo: [`lab-min/`](lab-min/) — 1 VM compose (`e2-standard-4`, `pd-balanced`) + Cloud Run `luure-agent-server` (`min=0`). Região `southamerica-east1`.
 
 | Path | Purpose |
 |------|---------|
-| `terraform-vm/` | GCE VM + disco + firewall (host do ledger) |
-| `ledger-vm/` | Indy von-network em VM dedicada |
-| `cloudrun/` | Deploy demo Cloud Run (API + frontends) |
-| `helm/` | Charts K8s (ACA-Py, postgres, redis, von-network) |
-| `nginx/` | Reverse proxy do hub VM |
+| `lab-min/` | **Vigente.** Terraform do lab (VPC, VM, secrets, Cloud Run, budget) |
+| `terraform-vm/` | **Legado.** VM voce-br / pd-ssd / VPC default |
+| `ledger-vm/` | **Legado.** Script e2-medium sem Postgres |
+| `cloudrun/` | **Legado.** FastAPI + portais Vite |
+| `helm/` | **Legado.** Charts k8s |
+| `nginx/` | Reverse proxy histórico do hub VM |
 
-Scripts compartilhados: `../../scripts/`.
+Caminhos legado: [`LEGACY.md`](LEGACY.md). Scripts compartilhados: `../../scripts/`.
