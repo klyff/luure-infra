@@ -1,0 +1,43 @@
+flowchart TB
+  subgraph devices [Dispositivos]
+    wallet["Wallet SOU 2.0<br/>Expo / EAS<br/>chave do holder no aparelho"]
+  end
+
+  subgraph vercel [Vercel - producao atual da demo]
+    agentVercel["luure-agent<br/>agent.luure.com.br"]
+  end
+
+  subgraph gcp [GCP Luure - southamerica-east1]
+    subgraph lab [projeto luure-lab]
+      ledger["GKE / VM Ledger<br/>von-network Indy"]
+      acapy["ACA-Py issuer + verifier<br/>admin API com api-key, rede interna"]
+      pgLedger["Postgres + PgBouncer<br/>askar wallets"]
+      redis["Redis"]
+    end
+
+    subgraph mvp [projeto luure-mvp]
+      run["Cloud Run<br/>luure-agent-server<br/>OID4VCI / OID4VP / OTP"]
+      sql["Cloud SQL Postgres<br/>credenciais e estado efemero"]
+      secrets["Secret Manager<br/>ISSUER_JWK, GOVBR_JWK, wallet keys"]
+      ar["Artifact Registry<br/>imagens por digest"]
+    end
+
+    subgraph shared [Compartilhado]
+      logs["Cloud Logging + Monitoring<br/>audit log sink"]
+      wif["Workload Identity Federation<br/>GitHub Actions sem chave JSON"]
+    end
+  end
+
+  wallet -->|"OID4VCI / OID4VP"| agentVercel
+  wallet -->|"apos paridade"| run
+  run --> sql
+  run --> secrets
+  ar --> run
+  acapy --> pgLedger
+  acapy --> ledger
+  acapy --> redis
+  run -.->|"fase 3+: DIDComm"| acapy
+  wif --> run
+  wif --> ledger
+  run --> logs
+  ledger --> logs
